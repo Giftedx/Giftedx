@@ -22,7 +22,7 @@ systems — some of it quietly practical.
 
 | Project | What it is |
 | --- | --- |
-| **ha·ggis Hub** | A playable Highland-games arcade lobby — Rust + WebAssembly core, hand-rolled Canvas renderer. *"ha + ggis = haggis."* |
+| **[ha·ggis Hub](https://github.com/Giftedx/ha-ggis-hub)** | A playable Highland-games arcade lobby — Rust + WebAssembly core, hand-rolled Canvas renderer. *"ha + ggis = haggis."* &nbsp;[🎮 live](https://ha.ggis.xyz) |
 | **Wild Haggis Survivors** | A *Vampire Survivors*-style browser game starring a wild haggis with a clockwise "drift" — Phaser + TypeScript. |
 | **AccentGuessr** | *GeoGuessr for voices*: hear a speaker, pin their accent on a world map. Rust → WASM client, custom WebGPU renderer, server-authoritative netcode. |
 | **IdleScape** | A self-directed *Old School RuneScape* idle game rendered in the real 3D world — Go engine + WebGL client. |
@@ -42,3 +42,4 @@ systems — some of it quietly practical.
 ---
 
 <div align="center"><sub>Built with care. No slop. 🏴󠁧󠁢󠁳󠁣󠁴󠁿</sub></div>
+
