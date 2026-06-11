@@ -49,3 +49,5 @@ Private while they grow — each goes public when it's ready, and the links ligh
 ---
 
 <div align="center"><sub>Built with care. No slop. 🏴󠁧󠁢󠁳󠁣󠁴󠁿</sub></div>
+
+<!-- profile readme -->
