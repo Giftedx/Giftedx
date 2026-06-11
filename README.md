@@ -45,9 +45,3 @@ Private while they grow — each goes public when it's ready, and the links ligh
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?style=flat&logo=webassembly&logoColor=white)
 ![Phaser](https://img.shields.io/badge/Phaser-4-9070b0?style=flat)
 ![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)
-
----
-
-<div align="center"><sub>Built with care. No slop. 🏴󠁧󠁢󠁳󠁣󠁴󠁿</sub></div>
-
-<!-- profile readme -->
