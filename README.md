@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./assets/banner.svg" alt="Giftedx - systems, games, and a wee bit of Scotland" width="100%" />
+<img src="./assets/banner.png" alt="Four of the projects: the ha.ggis bothy, Wild Haggis Survivors, the AccentGuessr globe, and the IdleScape world" width="100%" />
 
 # Hi, I'm Michael 👋
 
@@ -45,3 +45,4 @@ Private while they grow — each goes public when it's ready, and the links ligh
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?style=flat&logo=webassembly&logoColor=white)
 ![Phaser](https://img.shields.io/badge/Phaser-4-9070b0?style=flat)
 ![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)
+
