@@ -6,7 +6,7 @@
 
 **I make playable things, and the engines underneath them.**
 
-Small worlds you can walk into, most of them with a Scottish accent. I work mostly in Rust and TypeScript, with a soft spot for the parts other folk skip: the deterministic core, the hash written by hand, the sprite drawn in code instead of shipped as a PNG.
+Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust and TypeScript, with a soft spot for the parts other folk skip: the deterministic core, the hash written by hand, the sprite drawn in code rather than shipped as a PNG.
 
 </div>
 
