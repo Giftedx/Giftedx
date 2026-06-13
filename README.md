@@ -23,7 +23,7 @@ Often with a wee bit of Scotland in them.
   </tr>
 </table>
 
-<sub>Also public: <a href="https://github.com/Giftedx/Project-Euler-Clanker">Project-Euler-Clanker</a> — classic maths problems with altogether too much architecture, courtesy of an AI that got carried away.</sub>
+<sub>Also public: <b><a href="https://ha.ggis.xyz/just-five-more-minutes/">Just Five More Minutes</a></b> — a 2004-flavoured bedroom game with a mini-MMO inside your CRT; everything generated at runtime (Three.js + Canvas). · <a href="https://github.com/Giftedx/Project-Euler-Clanker">Project-Euler-Clanker</a> — classic maths problems with altogether too much architecture, courtesy of an AI that got carried away.</sub>
 
 ### 🔨 In the workshop
 
