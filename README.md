@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="./assets/banner.png" alt="Four of the projects: the ha.ggis bothy, Wild Haggis Survivors, the AccentGuessr globe, and the IdleScape world" width="100%" />
+<img src="./assets/banner.png" alt="Four of Michael's projects side by side: the ha·ggis Hub bothy at sunset, the Wild Haggis Survivors main menu, the AccentGuessr globe, and the IdleScape 3D world" width="100%" />
 
-# Hi, I'm Michael 👋
+# Michael
 
-**I build polished systems and playable things.**
-Rust · Go · TypeScript · Python — from WebAssembly game engines to off-grid websites.
-Often with a wee bit of Scotland in them.
+**I make playable things, and the engines underneath them.**
+
+Small worlds you can walk into, most of them with a Scottish accent. I work mostly in Rust and TypeScript, with a soft spot for the parts other folk skip: the deterministic core, the hash written by hand, the sprite drawn in code instead of shipped as a PNG.
 
 </div>
 
@@ -14,27 +14,39 @@ Often with a wee bit of Scotland in them.
 
 <table>
   <tr>
-    <td width="50%"><a href="https://ha.ggis.xyz"><img src="./assets/hub-bothy.jpg" alt="ha·ggis Hub — the bothy, live at ha.ggis.xyz" /></a></td>
-    <td width="50%"><a href="https://github.com/Giftedx/wild-haggis-survivors"><img src="./assets/whs-menu.png" alt="Wild Haggis Survivors — main menu" /></a></td>
+    <td width="50%"><a href="https://ha.ggis.xyz"><img src="./assets/hub-bothy.jpg" alt="The ha·ggis Hub bothy — a Highland cottage interior at sunset with a lit hearth and the wee crowned haggis" /></a></td>
+    <td width="50%"><a href="https://ha.ggis.xyz/wild"><img src="./assets/whs-menu.png" alt="Wild Haggis Survivors main menu, its title glowing over a darkening moor" /></a></td>
   </tr>
   <tr>
-    <td valign="top"><b><a href="https://github.com/Giftedx/ha-ggis-hub">ha·ggis Hub</a></b> — a playable Highland-games arcade lobby. Walk the wee haggis to a door, tap, and you're in a game. Rust + WebAssembly core, hand-rolled Canvas renderer, strict TypeScript host. <i>"ha + ggis = haggis."</i><br/><b><a href="https://ha.ggis.xyz">▶ Play it live</a></b></td>
-    <td valign="top"><b><a href="https://github.com/Giftedx/wild-haggis-survivors">Wild Haggis Survivors</a></b> — a Highland-at-dusk bullet heaven. You play a wild haggis whose every input drifts a few degrees clockwise. Phaser 4 + TypeScript, every sprite drawn in code, bilingual English/Scots, deterministic replays.</td>
+    <td valign="top">
+      <b><a href="https://github.com/Giftedx/ha-ggis-hub">ha·ggis Hub</a></b><br/>
+      Walk up to a door, give it a tap, and you're in a game. <i>ha + ggis = haggis.</i><br/>
+      <sub>Rust + WebAssembly core · hand-rolled Canvas2D renderer · strict TypeScript host</sub><br/>
+      <a href="https://ha.ggis.xyz"><b>▶ Play it live</b></a>
+    </td>
+    <td valign="top">
+      <b><a href="https://github.com/Giftedx/wild-haggis-survivors">Wild Haggis Survivors</a></b><br/>
+      A Highland-at-dusk bullet heaven. Your haggis has famously uneven legs, so every step drifts a few degrees clockwise.<br/>
+      <sub>Phaser 4 + TypeScript · every sprite drawn in code · English &amp; Scots · deterministic replays</sub><br/>
+      <a href="https://ha.ggis.xyz/wild"><b>▶ Play it live</b></a>
+    </td>
   </tr>
 </table>
 
-<sub>Also public: <b><a href="https://ha.ggis.xyz/just-five-more-minutes/">Just Five More Minutes</a></b> — a 2004-flavoured bedroom game with a mini-MMO inside your CRT; everything generated at runtime (Three.js + Canvas). · <a href="https://github.com/Giftedx/Project-Euler-Clanker">Project-Euler-Clanker</a> — classic maths problems with altogether too much architecture, courtesy of an AI that got carried away.</sub>
+**Also live:** [Just Five More Minutes](https://ha.ggis.xyz/just-five-more-minutes/) — a 2004-flavoured bedroom RPG with a daft wee MMO running on the CRT while your mum asks you, three separate times, to tidy your room. Three.js, generated entirely at runtime.
+
+**Also public:** [Project-Euler-Clanker](https://github.com/Giftedx/Project-Euler-Clanker) — 138 maths problems wearing far too much architecture, after an AI got hold of them.
 
 ### 🔨 In the workshop
 
-Private while they grow — each goes public when it's ready, and the links light up here.
+Private while they grow. Each one goes public when it's good and ready.
 
 | Project | What it is |
 | --- | --- |
-| **AccentGuessr** | *GeoGuessr for voices*: two players hear a stranger speak and race to pin the accent on a world map. Rust → WASM client, custom WebGPU globe, hand-coded binary protocol, zero npm. |
-| **IdleScape** | A self-directed *Old School RuneScape* idle game rendered in the real 3D world — Go tick engine, React + WebGL client. |
-| **plex-for-discord** | Synced Plex watch-together inside Discord — a four-crate Rust workspace with a hand-rolled Discord Gateway client and a WASM/Leptos Activity. |
-| **Kittiwake** | A warm, honest website for an off-grid hut on the Isle of Mull — Astro + Tailwind, static, no fuss. |
+| **AccentGuessr** | *GeoGuessr for voices.* Two players hear a stranger speak and race to pin the accent on a world map. A Rust→WASM client, a WebGPU globe built from scratch, a binary protocol of its own, and not one npm package. |
+| **IdleScape** | Old School RuneScape, but idle — and playing out in an actual 3D world instead of a spreadsheet. Go tick engine, React + WebGL client. |
+| **plex-for-discord** | Watch Plex together inside Discord, properly in sync. A four-crate Rust workspace with its own Discord Gateway client and a WASM/Leptos activity. |
+| **Kittiwake** | A small, honest site for an off-grid hut on the Isle of Mull. Astro + Tailwind, and nothing it doesn't need. |
 
 ### 🧰 Toolbelt
 
@@ -46,3 +58,6 @@ Private while they grow — each goes public when it's ready, and the links ligh
 ![Phaser](https://img.shields.io/badge/Phaser-4-9070b0?style=flat)
 ![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)
 
+---
+
+<div align="center"><sub>Everything playable lives at <a href="https://ha.ggis.xyz">ha.ggis.xyz</a>. Mon then.</sub></div>
