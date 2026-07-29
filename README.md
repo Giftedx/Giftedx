@@ -10,7 +10,7 @@ Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust
 
 </div>
 
-### 🎮 Live now
+## 🎮 Live now
 
 <table>
   <tr>
@@ -37,7 +37,7 @@ Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust
 
 **Also public:** [Project-Euler-Clanker](https://github.com/Giftedx/Project-Euler-Clanker) — 138 maths problems wearing far too much architecture, after an AI got hold of them.
 
-### 🔨 In the workshop
+## 🔨 In the workshop
 
 Private while they grow. Each one goes public when it's good and ready.
 
@@ -48,7 +48,7 @@ Private while they grow. Each one goes public when it's good and ready.
 | **plex-for-discord** | Watch Plex together inside Discord, properly in sync. A four-crate Rust workspace with its own Discord Gateway client and a WASM/Leptos activity. |
 | **Kittiwake** | A small, honest site for an off-grid hut on the Isle of Mull. Astro + Tailwind, and nothing it doesn't need. |
 
-### 🧰 Toolbelt
+## 🧰 Toolbelt
 
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 ![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go&logoColor=white)
