@@ -14,7 +14,7 @@ Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust
 
 <table>
   <tr>
-    <td width="50%"><a href="https://ha.ggis.xyz"><img src="./assets/hub-bothy.jpg" alt="The ha·ggis Hub bothy — a Highland cottage interior at sunset with a lit hearth and the wee crowned haggis" /></a></td>
+    <td width="50%"><a href="https://ha.ggis.xyz"><img src="./assets/hub-bothy.png" alt="The ha·ggis Hub bothy — a Highland cottage interior at sunset with a lit hearth and the wee crowned haggis" /></a></td>
     <td width="50%"><a href="https://ha.ggis.xyz/wild"><img src="./assets/whs-menu.png" alt="Wild Haggis Survivors main menu, its title glowing over a darkening moor" /></a></td>
   </tr>
   <tr>
