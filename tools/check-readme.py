@@ -13,6 +13,12 @@ Violation = tuple[int, str, str]
 Check = Callable[[list[str]], list[Violation]]
 HEADING_LEVEL_RULE = "heading-level"
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
+BADGE_FORM_RULE = "badge-form"
+SHIELDS_URL = re.compile(r"https?://img\.shields\.io/[^\s<>'\")]+")
+BADGE_FORM = re.compile(
+    r"https://img\.shields\.io/badge/[^-/\s?]+-[^-/\s?]+"
+    r"\?style=flat(?:&logo=[^&\s<>'\")]+(?:&logoColor=white)?)?"
+)
 
 
 def check_heading_levels(lines: list[str]) -> list[Violation]:
@@ -73,7 +79,23 @@ def check_heading_levels(lines: list[str]) -> list[Violation]:
     return violations
 
 
-CHECKS: tuple[Check, ...] = (check_heading_levels,)
+def check_badge_form(lines: list[str]) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(lines, start=1):
+        for match in SHIELDS_URL.finditer(line):
+            if BADGE_FORM.fullmatch(match.group()) is None:
+                violations.append(
+                    (
+                        line_number,
+                        BADGE_FORM_RULE,
+                        "shields.io badge URL does not use the "
+                        "two-segment style=flat form",
+                    )
+                )
+    return violations
+
+
+CHECKS: tuple[Check, ...] = (check_heading_levels, check_badge_form)
 
 
 def collect_violations(lines: list[str]) -> list[Violation]:
@@ -119,7 +141,47 @@ def run_selftest() -> int:
         )
         return 1
 
-    print("selftest: 1 rule covered")
+    bad_badge_samples = (
+        "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
+        '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge">',
+    )
+    expected_badge_violation = [
+        (
+            1,
+            "badge-form",
+            "shields.io badge URL does not use the two-segment style=flat form",
+        )
+    ]
+    for sample in bad_badge_samples:
+        actual = collect_violations([sample])
+        if actual != expected_badge_violation:
+            print(
+                "selftest: badge-form: "
+                f"expected {expected_badge_violation!r}, got {actual!r}",
+                file=sys.stderr,
+            )
+            return 1
+
+    good_badge_lines = (
+        "![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)\n"
+        "![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go&logoColor=white)\n"
+        "![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)\n"
+        "![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)\n"
+        "![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?style=flat&logo=webassembly&logoColor=white)\n"
+        "![Phaser](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)\n"
+        "![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)\n"
+        "![License](https://img.shields.io/badge/License-blue?style=flat)\n"
+        "![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)\n"
+    ).splitlines()
+    actual = collect_violations(good_badge_lines)
+    if actual:
+        print(
+            f"selftest: badge-form: expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    print("selftest: 2 rules covered")
     return 0
 
 
