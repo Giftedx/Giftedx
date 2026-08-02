@@ -55,7 +55,7 @@ Private while they grow. Each one goes public when it's good and ready.
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
 ![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?style=flat&logo=webassembly&logoColor=white)
-![Phaser](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)
+![Phaser](https://img.shields.io/badge/Phaser%204-8A2BE2?style=flat&logo=phaser&logoColor=white)
 ![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)
 
 ---
