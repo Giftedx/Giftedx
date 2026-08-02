@@ -194,7 +194,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.selftest:
         return run_selftest()
 
-    lines = args.path.read_text(encoding="utf-8").splitlines()
+    try:
+        lines = args.path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as error:
+        print(f"error: cannot read {args.path}: {error}", file=sys.stderr)
+        return 2
     violations = collect_violations(lines)
     report_violations(args.path, violations)
     return 1 if violations else 0
