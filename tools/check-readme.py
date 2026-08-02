@@ -96,6 +96,10 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
 
 
 CHECKS: tuple[Check, ...] = (check_heading_levels, check_badge_form)
+CHECK_RULE_IDS: dict[Check, str] = {
+    check_heading_levels: HEADING_LEVEL_RULE,
+    check_badge_form: BADGE_FORM_RULE,
+}
 
 
 def collect_violations(lines: list[str]) -> list[Violation]:
@@ -111,11 +115,14 @@ def report_violations(path: Path, violations: list[Violation]) -> None:
 
 
 def run_selftest() -> int:
+    covered_rule_ids: set[str] = set()
+
     bad_lines = "# A\n### B\n".splitlines()
     expected = [
         (2, HEADING_LEVEL_RULE, "heading level jumps from h1 to h3"),
     ]
-    actual = check_heading_levels(bad_lines)
+    actual = collect_violations(bad_lines)
+    covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
             f"selftest: {HEADING_LEVEL_RULE}: expected {expected!r}, got {actual!r}",
@@ -133,7 +140,7 @@ def run_selftest() -> int:
         "\n"
         "## B\n"
     ).splitlines()
-    actual = check_heading_levels(good_lines)
+    actual = collect_violations(good_lines)
     if actual:
         print(
             f"selftest: {HEADING_LEVEL_RULE}: expected no violations, got {actual!r}",
@@ -154,6 +161,7 @@ def run_selftest() -> int:
     ]
     for sample in bad_badge_samples:
         actual = collect_violations([sample])
+        covered_rule_ids.update(rule for _, rule, _ in actual)
         if actual != expected_badge_violation:
             print(
                 "selftest: badge-form: "
@@ -181,7 +189,18 @@ def run_selftest() -> int:
         )
         return 1
 
-    print("selftest: 2 rules covered")
+    expected_rule_ids = {CHECK_RULE_IDS[check] for check in CHECKS}
+    if covered_rule_ids != expected_rule_ids:
+        missing = sorted(expected_rule_ids - covered_rule_ids)
+        unexpected = sorted(covered_rule_ids - expected_rule_ids)
+        print(
+            "selftest: rule coverage mismatch: "
+            f"missing {missing!r}, unexpected {unexpected!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"selftest: {len(CHECKS)} rules covered")
     return 0
 
 
