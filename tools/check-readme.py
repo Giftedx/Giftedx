@@ -16,7 +16,7 @@ HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
 BADGE_FORM_RULE = "badge-form"
 SHIELDS_URL = re.compile(r"https?://img\.shields\.io/[^\s<>'\")]+")
 BADGE_FORM = re.compile(
-    r"https://img\.shields\.io/badge/[^-/\s?]+-[^-/\s?]+"
+    r"https?://img\.shields\.io/badge/[^-/\s?]+-[^-/\s?]+"
     r"\?style=flat(?:&logo=[^&\s<>'\")]+(?:&logoColor=white)?)?"
 )
 LINK_TARGET_RULE = "link-target"
@@ -98,13 +98,22 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
     violations: list[Violation] = []
     for line_number, line in enumerate(lines, start=1):
         for match in SHIELDS_URL.finditer(line):
-            if BADGE_FORM.fullmatch(match.group()) is None:
+            url = match.group()
+            if BADGE_FORM.fullmatch(url) is None:
                 violations.append(
                     (
                         line_number,
                         BADGE_FORM_RULE,
                         "shields.io badge URL does not use the "
                         "two-segment style=flat form",
+                    )
+                )
+            elif url.startswith("http://"):
+                violations.append(
+                    (
+                        line_number,
+                        BADGE_FORM_RULE,
+                        "shields.io badge URL scheme must be https",
                     )
                 )
     return violations
@@ -191,17 +200,21 @@ def run_selftest() -> int:
         return 1
 
     bad_badge_samples = (
-        "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
-        '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge">',
-    )
-    expected_badge_violation = [
         (
-            1,
-            "badge-form",
+            "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
             "shields.io badge URL does not use the two-segment style=flat form",
-        )
-    ]
-    for sample in bad_badge_samples:
+        ),
+        (
+            '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge">',
+            "shields.io badge URL does not use the two-segment style=flat form",
+        ),
+        (
+            "![Rust](http://img.shields.io/badge/Rust-000000?style=flat)",
+            "shields.io badge URL scheme must be https",
+        ),
+    )
+    for sample, message in bad_badge_samples:
+        expected_badge_violation = [(1, "badge-form", message)]
         actual = collect_violations([sample])
         covered_rule_ids.update(rule for _, rule, _ in actual)
         if actual != expected_badge_violation:
