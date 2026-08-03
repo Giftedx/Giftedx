@@ -19,6 +19,20 @@ BADGE_FORM = re.compile(
     r"https://img\.shields\.io/badge/[^-/\s?]+-[^-/\s?]+"
     r"\?style=flat(?:&logo=[^&\s<>'\")]+(?:&logoColor=white)?)?"
 )
+ALT_TEXT_RULE = "alt-text"
+HTML_IMAGE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+HTML_ALT = re.compile(
+    r"\balt\s*=\s*(?:([\"'])(.*?)\1|([^\s>]+))",
+    re.IGNORECASE,
+)
+HTML_SRC = re.compile(
+    r"\bsrc\s*=\s*(?:([\"'])(.*?)\1|([^\s>]+))",
+    re.IGNORECASE,
+)
+MARKDOWN_IMAGE = re.compile(
+    r"!\[([^\]]*)\]\(\s*(?:<([^>]+)>|([^\s)]+))"
+)
+ALT_WORD = re.compile(r"\b\w+(?:[’'-]\w+)*\b")
 LINK_TARGET_RULE = "link-target"
 HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE)
 MARKDOWN_LINK_TARGET = re.compile(
@@ -110,6 +124,53 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
     return violations
 
 
+def check_alt_text(lines: list[str]) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(lines, start=1):
+        images: list[tuple[str | None, str]] = []
+        for image_match in HTML_IMAGE.finditer(line):
+            image = image_match.group()
+            alt_match = HTML_ALT.search(image)
+            src_match = HTML_SRC.search(image)
+            alt = None
+            if alt_match is not None:
+                alt = alt_match.group(2) or alt_match.group(3) or ""
+            src = ""
+            if src_match is not None:
+                src = src_match.group(2) or src_match.group(3) or ""
+            images.append((alt, src))
+
+        images.extend(
+            (match.group(1), match.group(2) or match.group(3))
+            for match in MARKDOWN_IMAGE.finditer(line)
+        )
+
+        for alt, src in images:
+            if alt is None or not alt.strip():
+                violations.append(
+                    (
+                        line_number,
+                        ALT_TEXT_RULE,
+                        "image alt text is missing or empty",
+                    )
+                )
+                continue
+
+            word_count = len(ALT_WORD.findall(alt))
+            if "img.shields.io/" not in src and word_count < 4:
+                word_label = "word" if word_count == 1 else "words"
+                violations.append(
+                    (
+                        line_number,
+                        ALT_TEXT_RULE,
+                        f"content image alt text has {word_count} {word_label}. "
+                        "Use at least 4 words",
+                    )
+                )
+
+    return violations
+
+
 def check_link_targets(lines: list[str]) -> list[Violation]:
     violations: list[Violation] = []
     for line_number, line in enumerate(lines, start=1):
@@ -135,11 +196,13 @@ def check_link_targets(lines: list[str]) -> list[Violation]:
 CHECKS: tuple[Check, ...] = (
     check_heading_levels,
     check_badge_form,
+    check_alt_text,
     check_link_targets,
 )
 CHECK_RULE_IDS: dict[Check, str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
     check_badge_form: BADGE_FORM_RULE,
+    check_alt_text: ALT_TEXT_RULE,
     check_link_targets: LINK_TARGET_RULE,
 }
 
@@ -192,7 +255,7 @@ def run_selftest() -> int:
 
     bad_badge_samples = (
         "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
-        '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge">',
+        '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge" alt="Go">',
     )
     expected_badge_violation = [
         (
@@ -227,6 +290,56 @@ def run_selftest() -> int:
     if actual:
         print(
             f"selftest: badge-form: expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    bad_alt_text_samples = (
+        (
+            '<img src="./assets/x.png" />',
+            [(1, "alt-text", "image alt text is missing or empty")],
+        ),
+        (
+            '<img src="./assets/x.png" alt="banner" />',
+            [
+                (
+                    1,
+                    "alt-text",
+                    "content image alt text has 1 word. Use at least 4 words",
+                )
+            ],
+        ),
+        (
+            "![](./assets/x.png)",
+            [(1, "alt-text", "image alt text is missing or empty")],
+        ),
+    )
+    for sample, expected in bad_alt_text_samples:
+        actual = collect_violations([sample])
+        covered_rule_ids.update(rule for _, rule, _ in actual)
+        if actual != expected:
+            print(
+                f"selftest: alt-text: expected {expected!r}, got {actual!r}",
+                file=sys.stderr,
+            )
+            return 1
+
+    good_alt_text_lines = (
+        '<img src="./assets/banner.png" alt="Four projects shown side by side" />\n'
+        '<img src="./assets/hub-bothy.png" alt="A Highland cottage interior at sunset" />\n'
+        '<img src="./assets/whs-menu.png" alt="Wild Haggis Survivors main menu" />\n'
+        "![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)\n"
+        "![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go&logoColor=white)\n"
+        "![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)\n"
+        "![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)\n"
+        "![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?style=flat&logo=webassembly&logoColor=white)\n"
+        "![Phaser 4](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)\n"
+        "![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)\n"
+    ).splitlines()
+    actual = collect_violations(good_alt_text_lines)
+    if actual:
+        print(
+            f"selftest: alt-text: expected no violations, got {actual!r}",
             file=sys.stderr,
         )
         return 1
