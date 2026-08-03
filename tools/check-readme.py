@@ -19,6 +19,21 @@ BADGE_FORM = re.compile(
     r"https://img\.shields\.io/badge/[^-/\s?]+-[^-/\s?]+"
     r"\?style=flat(?:&logo=[^&\s<>'\")]+(?:&logoColor=white)?)?"
 )
+LINK_TARGET_RULE = "link-target"
+HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE)
+MARKDOWN_LINK_TARGET = re.compile(
+    r"(?<!!)\[[^\]]+\]\(\s*(?:<([^>]+)>|([^\s)]+))"
+)
+APPROVED_LINK_TARGETS = frozenset(
+    {
+        "https://ha.ggis.xyz",
+        "https://ha.ggis.xyz/wild",
+        "https://ha.ggis.xyz/just-five-more-minutes/",
+        "https://github.com/Giftedx/ha-ggis-hub",
+        "https://github.com/Giftedx/wild-haggis-survivors",
+        "https://github.com/Giftedx/Project-Euler-Clanker",
+    }
+)
 
 
 def check_heading_levels(lines: list[str]) -> list[Violation]:
@@ -95,10 +110,37 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
     return violations
 
 
-CHECKS: tuple[Check, ...] = (check_heading_levels, check_badge_form)
+def check_link_targets(lines: list[str]) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(lines, start=1):
+        targets = [match.group(2) for match in HTML_HREF.finditer(line)]
+        targets.extend(
+            match.group(1) or match.group(2)
+            for match in MARKDOWN_LINK_TARGET.finditer(line)
+        )
+        for target in targets:
+            if target.startswith(("http://", "https://")) and (
+                target not in APPROVED_LINK_TARGETS
+            ):
+                violations.append(
+                    (
+                        line_number,
+                        LINK_TARGET_RULE,
+                        "outbound link target is not approved",
+                    )
+                )
+    return violations
+
+
+CHECKS: tuple[Check, ...] = (
+    check_heading_levels,
+    check_badge_form,
+    check_link_targets,
+)
 CHECK_RULE_IDS: dict[Check, str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
     check_badge_form: BADGE_FORM_RULE,
+    check_link_targets: LINK_TARGET_RULE,
 }
 
 
@@ -185,6 +227,34 @@ def run_selftest() -> int:
     if actual:
         print(
             f"selftest: badge-form: expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    bad_link_lines = (
+        "[Just Five More Minutes]"
+        "(https://ha.ggis.xyz/just-five-more-minuets/)"
+    ).splitlines()
+    expected = [
+        (1, "link-target", "outbound link target is not approved"),
+    ]
+    actual = collect_violations(bad_link_lines)
+    covered_rule_ids.update(rule for _, rule, _ in actual)
+    if actual != expected:
+        print(
+            f"selftest: link-target: expected {expected!r}, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    good_link_lines = (
+        "<a href=\"https://ha.ggis.xyz/wild\">Play</a>\n"
+        "[Source](https://github.com/Giftedx/ha-ggis-hub)\n"
+    ).splitlines()
+    actual = collect_violations(good_link_lines)
+    if actual:
+        print(
+            f"selftest: link-target: expected no violations, got {actual!r}",
             file=sys.stderr,
         )
         return 1
