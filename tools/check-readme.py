@@ -45,6 +45,7 @@ APPROVED_LINK_TARGETS = frozenset(
         "https://ha.ggis.xyz/just-five-more-minutes/",
         "https://github.com/Giftedx/ha-ggis-hub",
         "https://github.com/Giftedx/wild-haggis-survivors",
+        "https://github.com/Giftedx/just-five-more-minutes",
         "https://github.com/Giftedx/Project-Euler-Clanker",
     }
 )

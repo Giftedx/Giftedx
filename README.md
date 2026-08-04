@@ -4,9 +4,9 @@
 
 # Michael
 
-**I make playable things, and the engines underneath them.**
+**Systems, games, and a wee bit of Scotland.**
 
-Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust and TypeScript, with a soft spot for the parts other folk skip: the deterministic core, the hash written by hand, the sprite drawn in code rather than shipped as a PNG.
+I make playable things, and the engines underneath them. Mostly Rust and TypeScript, with a soft spot for the parts other folk skip: the deterministic core, the hash written by hand, the sprite drawn in code.
 
 </div>
 
@@ -20,7 +20,7 @@ Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust
   <tr>
     <td valign="top">
       <b><a href="https://github.com/Giftedx/ha-ggis-hub">ha·ggis Hub</a></b><br/>
-      Walk up to a door, give it a tap, and you're in a game. <i>ha + ggis = haggis.</i><br/>
+      The lobby. Chap a door and you're in a game. <i>ha + ggis = haggis.</i><br/>
       <sub>Rust + WebAssembly core · hand-rolled Canvas2D renderer · strict TypeScript host</sub><br/>
       <a href="https://ha.ggis.xyz"><b>▶ Play it live</b></a>
     </td>
@@ -33,20 +33,36 @@ Small worlds you can walk into, most of them with a Scottish accent. Mostly Rust
   </tr>
 </table>
 
-**Also live:** [Just Five More Minutes](https://ha.ggis.xyz/just-five-more-minutes/) — a 2004-flavoured bedroom RPG with a daft wee MMO running on the CRT while your mum asks you, three separate times, to tidy your room. Three.js, generated entirely at runtime.
+**[Just Five More Minutes](https://github.com/Giftedx/just-five-more-minutes)** — a 2004-flavoured bedroom game with a daft wee MMO running on the CRT while your mum asks you, three separate times, to tidy your room. Three.js, generated entirely at runtime. [▶ Play it live](https://ha.ggis.xyz/just-five-more-minutes/)
 
-**Also public:** [Project-Euler-Clanker](https://github.com/Giftedx/Project-Euler-Clanker) — 138 maths problems wearing far too much architecture, after an AI got hold of them.
+**[Project-Euler-Clanker](https://github.com/Giftedx/Project-Euler-Clanker)** — 138 maths problems wearing far too much architecture, after an AI got hold of them.
+
+```mermaid
+flowchart LR
+    subgraph live["Live at ha.ggis.xyz"]
+        hub["ha·ggis Hub — the lobby"] -->|door| whs["Wild Haggis Survivors"]
+        hub -->|door| jfmm["Just Five More Minutes"]
+    end
+    subgraph shop["The workshop — private, for now"]
+        ag["AccentGuessr"]
+        is["IdleScape"]
+        pfd["plex-for-discord"]
+    end
+    robot["the robot"] -.->|tends| live
+    robot -.->|tends| shop
+```
 
 ## 🔨 In the workshop
 
-Private while they grow. Each one goes public when it's good and ready.
+Private while they grow, so no links — nothing here should 404 on you.
 
 | Project | What it is |
 | --- | --- |
-| **AccentGuessr** | *GeoGuessr for voices.* Two players hear a stranger speak and race to pin the accent on a world map. A Rust→WASM client, a WebGPU globe built from scratch, a binary protocol of its own, and not one npm package. |
-| **IdleScape** | Old School RuneScape, but idle — and playing out in an actual 3D world instead of a spreadsheet. Go tick engine, React + WebGL client. |
-| **plex-for-discord** | Watch Plex together inside Discord, properly in sync. A four-crate Rust workspace with its own Discord Gateway client and a WASM/Leptos activity. |
-| **Kittiwake** | A small, honest site for an off-grid hut on the Isle of Mull. Astro + Tailwind, and nothing it doesn't need. |
+| **The robot** | It scouts my repos for red CI and rough edges, writes a fix, verifies it, and ships it. A second model reviews anything that smells off. |
+| **AccentGuessr** | *GeoGuessr for voices.* Hear a stranger speak, race to pin the accent on the map. Rust→WASM client, a hand-rolled WebGPU globe, zero npm packages. |
+| **IdleScape** | Old School RuneScape, but idle — in an actual 3D world instead of a spreadsheet. Go tick engine, React + WebGL client. |
+| **plex-for-discord** | Watch Plex together inside Discord, properly in sync. A four-crate Rust workspace with its own Discord Gateway client. |
+| **Kittiwake** | A small, honest site for the family's off-grid hut on the Isle of Mull. Astro + Tailwind, and nothing it doesn't need. |
 
 ## 🧰 Toolbelt
 
