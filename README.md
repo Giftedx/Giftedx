@@ -49,6 +49,7 @@ flowchart LR
         ag["AccentGuessr"]
         is["IdleScape"]
         pfd["plex-for-discord"]
+        kw["Kittiwake"]
     end
     robot["the robot"] -.->|tends| live
     robot -.->|tends| shop

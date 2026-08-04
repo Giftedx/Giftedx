@@ -38,6 +38,12 @@ HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE
 MARKDOWN_LINK_TARGET = re.compile(
     r"(?<!!)\[[^\]]+\]\(\s*(?:<([^>]+)>|([^\s)]+))"
 )
+WORKSHOP_PROJECTS_RULE = "workshop-projects"
+SHOP_SUBGRAPH = re.compile(r"^\s*subgraph\s+shop(?:\[.*\])?\s*$")
+MERMAID_NODE = re.compile(r'^\s*[\w-]+\s*\[\s*"([^"]+)"\s*\]')
+WORKSHOP_TABLE_HEADER = re.compile(r"^\|\s*Project\s*\|")
+WORKSHOP_TABLE_PROJECT = re.compile(r"^\|\s*\*\*(.+?)\*\*\s*\|")
+WORKSHOP_TABLE_NON_PROJECTS = frozenset({"The robot"})
 APPROVED_LINK_TARGETS = frozenset(
     {
         "https://ha.ggis.xyz",
@@ -194,17 +200,71 @@ def check_link_targets(lines: list[str]) -> list[Violation]:
     return violations
 
 
+def check_workshop_projects(lines: list[str]) -> list[Violation]:
+    shop_projects: dict[str, int] = {}
+    table_projects: dict[str, int] = {}
+    in_shop = False
+    in_table = False
+
+    for line_number, line in enumerate(lines, start=1):
+        if SHOP_SUBGRAPH.match(line):
+            in_shop = True
+            continue
+        if in_shop:
+            if line.strip() == "end":
+                in_shop = False
+                continue
+            match = MERMAID_NODE.match(line)
+            if match:
+                shop_projects[match.group(1)] = line_number
+
+        if WORKSHOP_TABLE_HEADER.match(line):
+            in_table = True
+            continue
+        if in_table:
+            match = WORKSHOP_TABLE_PROJECT.match(line)
+            if match:
+                project = match.group(1)
+                if project not in WORKSHOP_TABLE_NON_PROJECTS:
+                    table_projects[project] = line_number
+            elif not line.startswith("|"):
+                in_table = False
+
+    violations: list[Violation] = []
+    for project in sorted(table_projects.keys() - shop_projects.keys()):
+        violations.append(
+            (
+                table_projects[project],
+                WORKSHOP_PROJECTS_RULE,
+                "workshop table project is missing from shop subgraph: "
+                f"{project}",
+            )
+        )
+    for project in sorted(shop_projects.keys() - table_projects.keys()):
+        violations.append(
+            (
+                shop_projects[project],
+                WORKSHOP_PROJECTS_RULE,
+                "shop subgraph project is missing from workshop table: "
+                f"{project}",
+            )
+        )
+    return violations
+
+
 CHECKS: tuple[Check, ...] = (
     check_heading_levels,
     check_badge_form,
     check_alt_text,
     check_link_targets,
+    check_workshop_projects,
 )
 CHECK_RULE_IDS: dict[Check, str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
     check_badge_form: BADGE_FORM_RULE,
     check_alt_text: ALT_TEXT_RULE,
     check_link_targets: LINK_TARGET_RULE,
+    check_workshop_projects: WORKSHOP_PROJECTS_RULE,
 }
 
 
@@ -369,6 +429,39 @@ def run_selftest() -> int:
     if actual:
         print(
             f"selftest: link-target: expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    bad_workshop_lines = (
+        "```mermaid\n"
+        "flowchart LR\n"
+        '    subgraph shop["The workshop — private, for now"]\n'
+        '        ag["AccentGuessr"]\n'
+        "    end\n"
+        "```\n"
+        "\n"
+        "# In the workshop\n"
+        "\n"
+        "| Project | What it is |\n"
+        "| --- | --- |\n"
+        "| **The robot** | It tends the projects. |\n"
+        "| **AccentGuessr** | A game. |\n"
+        "| **Kittiwake** | A website. |\n"
+    ).splitlines()
+    expected = [
+        (
+            14,
+            "workshop-projects",
+            "workshop table project is missing from shop subgraph: Kittiwake",
+        ),
+    ]
+    actual = collect_violations(bad_workshop_lines)
+    covered_rule_ids.update(rule for _, rule, _ in actual)
+    if actual != expected:
+        print(
+            "selftest: workshop-projects: "
+            f"expected {expected!r}, got {actual!r}",
             file=sys.stderr,
         )
         return 1
