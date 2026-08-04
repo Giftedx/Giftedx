@@ -38,6 +38,8 @@ HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE
 MARKDOWN_LINK_TARGET = re.compile(
     r"(?<!!)\[[^\]]+\]\(\s*(?:<([^>]+)>|([^\s)]+))"
 )
+AUTOLINK_TARGET = re.compile(r"<(https?://[^\s<>]+)>")
+BARE_URL = re.compile(r'''(?<!<)https?://[^\s<>"')]*[^\s<>"'.,;:!?)]''')
 WORKSHOP_PROJECTS_RULE = "workshop-projects"
 SHOP_SUBGRAPH = re.compile(r"^\s*subgraph\s+shop(?:\[.*\])?\s*$")
 MERMAID_NODE = re.compile(r'^\s*[\w-]+\s*\[\s*"([^"]+)"\s*\]')
@@ -180,12 +182,72 @@ def check_alt_text(lines: list[str]) -> list[Violation]:
 
 def check_link_targets(lines: list[str]) -> list[Violation]:
     violations: list[Violation] = []
+    fence_char: str | None = None
+    fence_length = 0
+
     for line_number, line in enumerate(lines, start=1):
-        targets = [match.group(2) for match in HTML_HREF.finditer(line)]
-        targets.extend(
-            match.group(1) or match.group(2)
-            for match in MARKDOWN_LINK_TARGET.finditer(line)
-        )
+        stripped = line.lstrip(" ")
+        indent = len(line) - len(stripped)
+
+        if fence_char is not None:
+            marker_length = len(stripped) - len(stripped.lstrip(fence_char))
+            if (
+                indent <= 3
+                and marker_length >= fence_length
+                and not stripped[marker_length:].strip()
+            ):
+                fence_char = None
+                fence_length = 0
+            continue
+
+        marker_char = stripped[:1]
+        if indent <= 3 and marker_char in ("`", "~"):
+            marker_length = len(stripped) - len(stripped.lstrip(marker_char))
+            info = stripped[marker_length:]
+            if marker_length >= 3 and not (
+                marker_char == "`" and "`" in info
+            ):
+                fence_char = marker_char
+                fence_length = marker_length
+                continue
+
+        targets: list[str] = []
+        link_syntax_spans: list[tuple[int, int]] = []
+
+        for match in HTML_HREF.finditer(line):
+            targets.append(match.group(2))
+            link_syntax_spans.append(match.span(2))
+
+        for match in MARKDOWN_LINK_TARGET.finditer(line):
+            group = 1 if match.group(1) is not None else 2
+            targets.append(match.group(group))
+            link_syntax_spans.append(match.span(group))
+
+        for match in AUTOLINK_TARGET.finditer(line):
+            targets.append(match.group(1))
+            link_syntax_spans.append(match.span(1))
+
+        for image_match in HTML_IMAGE.finditer(line):
+            src_match = HTML_SRC.search(image_match.group())
+            if src_match is not None:
+                group = 2 if src_match.group(2) is not None else 3
+                start, end = src_match.span(group)
+                link_syntax_spans.append(
+                    (image_match.start() + start, image_match.start() + end)
+                )
+
+        for match in MARKDOWN_IMAGE.finditer(line):
+            group = 2 if match.group(2) is not None else 3
+            link_syntax_spans.append(match.span(group))
+
+        for match in BARE_URL.finditer(line):
+            if any(
+                match.start() >= start and match.end() <= end
+                for start, end in link_syntax_spans
+            ):
+                continue
+            targets.append(match.group())
+
         for target in targets:
             if target.startswith(("http://", "https://")) and (
                 target not in APPROVED_LINK_TARGETS
@@ -315,7 +377,7 @@ def run_selftest() -> int:
         return 1
 
     bad_badge_samples = (
-        "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
+        "![Phaser](https://img.shields.io/badge/Phaser-4-9070b0?style=flat)",
         '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge" alt="Go">',
     )
     expected_badge_violation = [
@@ -407,10 +469,20 @@ def run_selftest() -> int:
 
     bad_link_lines = (
         "[Just Five More Minutes]"
-        "(https://ha.ggis.xyz/just-five-more-minuets/)"
+        "(https://ha.ggis.xyz/just-five-more-minuets/)\n"
+        "Kittiwake https://github.com/Giftedx/Kittiwake\n"
+        "Kittiwake <https://github.com/Giftedx/Kittiwake>\n"
+        "Kittiwake (https://github.com/Giftedx/Kittiwake)\n"
+        'Kittiwake "https://github.com/Giftedx/Kittiwake"\n'
+        "Kittiwake 'https://github.com/Giftedx/Kittiwake'\n"
     ).splitlines()
     expected = [
         (1, "link-target", "outbound link target is not approved"),
+        (2, "link-target", "outbound link target is not approved"),
+        (3, "link-target", "outbound link target is not approved"),
+        (4, "link-target", "outbound link target is not approved"),
+        (5, "link-target", "outbound link target is not approved"),
+        (6, "link-target", "outbound link target is not approved"),
     ]
     actual = collect_violations(bad_link_lines)
     covered_rule_ids.update(rule for _, rule, _ in actual)
@@ -424,6 +496,14 @@ def run_selftest() -> int:
     good_link_lines = (
         "<a href=\"https://ha.ggis.xyz/wild\">Play</a>\n"
         "[Source](https://github.com/Giftedx/ha-ggis-hub)\n"
+        "**[Source](https://github.com/Giftedx/ha-ggis-hub)**: code\n"
+        "Everything lives at https://ha.ggis.xyz.\n"
+        "Everything lives at https://ha.ggis.xyz, for now.\n"
+        'Everything lives at "https://ha.ggis.xyz".\n'
+        "Everything lives at (https://ha.ggis.xyz).\n"
+        "```sh\n"
+        "git clone https://github.com/Giftedx/Kittiwake\n"
+        "```\n"
     ).splitlines()
     actual = collect_violations(good_link_lines)
     if actual:
