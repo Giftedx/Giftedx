@@ -7,10 +7,11 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 
 Violation = tuple[int, str, str]
-Check = Callable[[list[str]], list[Violation]]
+Check = Callable[[list[str], Path], list[Violation]]
 HEADING_LEVEL_RULE = "heading-level"
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
 BADGE_FORM_RULE = "badge-form"
@@ -20,6 +21,7 @@ BADGE_FORM = re.compile(
     r"\?style=flat(?:&logo=[^&\s<>'\")]+(?:&logoColor=white)?)?"
 )
 ALT_TEXT_RULE = "alt-text"
+IMAGE_FILE_RULE = "image-file"
 HTML_IMAGE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 HTML_ALT = re.compile(
     r"\balt\s*=\s*(?:([\"'])(.*?)\1|([^\s>]+))",
@@ -57,7 +59,9 @@ APPROVED_LINK_TARGETS = frozenset(
 )
 
 
-def check_heading_levels(lines: list[str]) -> list[Violation]:
+def check_heading_levels(
+    lines: list[str], _readme_path: Path
+) -> list[Violation]:
     violations: list[Violation] = []
     previous_level: int | None = None
     fence_char: str | None = None
@@ -115,7 +119,7 @@ def check_heading_levels(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_badge_form(lines: list[str]) -> list[Violation]:
+def check_badge_form(lines: list[str], _readme_path: Path) -> list[Violation]:
     violations: list[Violation] = []
     for line_number, line in enumerate(lines, start=1):
         for match in SHIELDS_URL.finditer(line):
@@ -131,7 +135,7 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_alt_text(lines: list[str]) -> list[Violation]:
+def check_alt_text(lines: list[str], _readme_path: Path) -> list[Violation]:
     violations: list[Violation] = []
     for line_number, line in enumerate(lines, start=1):
         images: list[tuple[str | None, str]] = []
@@ -178,7 +182,41 @@ def check_alt_text(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_link_targets(lines: list[str]) -> list[Violation]:
+def check_image_files(lines: list[str], readme_path: Path) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(lines, start=1):
+        sources: list[str] = []
+        for image_match in HTML_IMAGE.finditer(line):
+            src_match = HTML_SRC.search(image_match.group())
+            if src_match is not None:
+                sources.append(src_match.group(2) or src_match.group(3) or "")
+        sources.extend(
+            match.group(2) or match.group(3)
+            for match in MARKDOWN_IMAGE.finditer(line)
+        )
+
+        for source in sources:
+            parsed = urlsplit(source)
+            relative_path = Path(unquote(parsed.path))
+            if (
+                parsed.scheme
+                or parsed.netloc
+                or not parsed.path
+                or relative_path.is_absolute()
+            ):
+                continue
+            if not (readme_path.parent / relative_path).is_file():
+                violations.append(
+                    (
+                        line_number,
+                        IMAGE_FILE_RULE,
+                        f"relative image file does not exist: {source}",
+                    )
+                )
+    return violations
+
+
+def check_link_targets(lines: list[str], _readme_path: Path) -> list[Violation]:
     violations: list[Violation] = []
     for line_number, line in enumerate(lines, start=1):
         targets = [match.group(2) for match in HTML_HREF.finditer(line)]
@@ -200,7 +238,9 @@ def check_link_targets(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_workshop_projects(lines: list[str]) -> list[Violation]:
+def check_workshop_projects(
+    lines: list[str], _readme_path: Path
+) -> list[Violation]:
     shop_projects: dict[str, int] = {}
     table_projects: dict[str, int] = {}
     in_shop = False
@@ -256,6 +296,7 @@ CHECKS: tuple[Check, ...] = (
     check_heading_levels,
     check_badge_form,
     check_alt_text,
+    check_image_files,
     check_link_targets,
     check_workshop_projects,
 )
@@ -263,15 +304,19 @@ CHECK_RULE_IDS: dict[Check, str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
     check_badge_form: BADGE_FORM_RULE,
     check_alt_text: ALT_TEXT_RULE,
+    check_image_files: IMAGE_FILE_RULE,
     check_link_targets: LINK_TARGET_RULE,
     check_workshop_projects: WORKSHOP_PROJECTS_RULE,
 }
 
 
-def collect_violations(lines: list[str]) -> list[Violation]:
+def collect_violations(
+    lines: list[str],
+    readme_path: Path = Path(__file__).parent.parent / "README.md",
+) -> list[Violation]:
     violations: list[Violation] = []
     for check in CHECKS:
-        violations.extend(check(lines))
+        violations.extend(check(lines, readme_path))
     return violations
 
 
@@ -357,11 +402,11 @@ def run_selftest() -> int:
 
     bad_alt_text_samples = (
         (
-            '<img src="./assets/x.png" />',
+            '<img src="./assets/banner.png" />',
             [(1, "alt-text", "image alt text is missing or empty")],
         ),
         (
-            '<img src="./assets/x.png" alt="banner" />',
+            '<img src="./assets/banner.png" alt="banner" />',
             [
                 (
                     1,
@@ -371,7 +416,7 @@ def run_selftest() -> int:
             ],
         ),
         (
-            "![](./assets/x.png)",
+            "![](./assets/banner.png)",
             [(1, "alt-text", "image alt text is missing or empty")],
         ),
     )
@@ -404,6 +449,27 @@ def run_selftest() -> int:
             file=sys.stderr,
         )
         return 1
+
+    readme_path = Path(__file__).with_name("__missing_readme__")
+    bad_image_lines = [
+        '<img src="./assets/missing.png" '
+        'alt="Four projects shown side by side" />'
+    ]
+    expected = [
+        (
+            1,
+            "image-file",
+            "relative image file does not exist: ./assets/missing.png",
+        )
+    ]
+    actual = collect_violations(bad_image_lines, readme_path)
+    if actual != expected:
+        print(
+            f"selftest: image-file: expected {expected!r}, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+    covered_rule_ids.update(rule for _, rule, _ in actual)
 
     bad_link_lines = (
         "[Just Five More Minutes]"
@@ -495,7 +561,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, UnicodeDecodeError) as error:
         print(f"error: cannot read {args.path}: {error}", file=sys.stderr)
         return 2
-    violations = collect_violations(lines)
+    violations = collect_violations(lines, args.path)
     report_violations(args.path, violations)
     return 1 if violations else 0
 
