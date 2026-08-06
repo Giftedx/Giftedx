@@ -37,8 +37,6 @@ I make playable things, and the engines underneath them. Mostly Rust and TypeScr
 
 **[Just Five More Minutes](https://github.com/Giftedx/just-five-more-minutes)**: a 2004-flavoured bedroom game. A daft wee MMO runs on the bedroom CRT while your mum asks you, three separate times, to tidy your room. Three.js, generated entirely at runtime. [▶ Play it live](https://ha.ggis.xyz/just-five-more-minutes/)
 
-**[Project-Euler-Clanker](https://github.com/Giftedx/Project-Euler-Clanker)**: 138 maths problems wearing far too much architecture, after an AI got hold of them.
-
 ```mermaid
 flowchart LR
     subgraph live["Live at ha.ggis.xyz"]
@@ -54,6 +52,10 @@ flowchart LR
     robot["the robot"] -.->|tends| live
     robot -.->|tends| shop
 ```
+
+## 🧮 Other
+
+**[Project-Euler-Clanker](https://github.com/Giftedx/Project-Euler-Clanker)**: 138 maths problems wearing far too much architecture, after an AI got hold of them. (Outside the diagram.)
 
 ## 🔨 In the workshop
 
