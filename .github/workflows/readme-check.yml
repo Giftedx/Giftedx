@@ -1,8 +1,16 @@
 name: Check README
 
 on:
+  # main only: an unrestricted push trigger ran this twice for every pull
+  # request — once for the branch push, once for the pull request itself.
   push:
+    branches: [main]
   pull_request:
+
+# A superseded run wastes a runner without this.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
