@@ -7,6 +7,7 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
+from urllib.parse import unquote
 
 
 Violation = tuple[int, str, str]
@@ -18,6 +19,10 @@ SHIELDS_URL = re.compile(r"https?://img\.shields\.io/[^\s<>'\")]+")
 BADGE_FORM = re.compile(
     r"https://img\.shields\.io/badge/[^-/\s?]+-[^-/\s?]+"
     r"\?style=flat(?:&logo=[^&\s<>'\")]+(?:&logoColor=white)?)?"
+)
+BADGE_ALT_TEXT_RULE = "badge-alt-text"
+BADGE_LABEL = re.compile(
+    r"^https?://img\.shields\.io/badge/([^-/\s?]+)-"
 )
 ALT_TEXT_RULE = "alt-text"
 HTML_IMAGE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
@@ -128,6 +133,44 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
                         "two-segment style=flat form",
                     )
                 )
+    return violations
+
+
+def check_badge_alt_text(lines: list[str]) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(lines, start=1):
+        images: list[tuple[str | None, str]] = []
+        for image_match in HTML_IMAGE.finditer(line):
+            image = image_match.group()
+            alt_match = HTML_ALT.search(image)
+            src_match = HTML_SRC.search(image)
+            alt = None
+            if alt_match is not None:
+                alt = alt_match.group(2) or alt_match.group(3) or ""
+            src = ""
+            if src_match is not None:
+                src = src_match.group(2) or src_match.group(3) or ""
+            images.append((alt, src))
+
+        images.extend(
+            (match.group(1), match.group(2) or match.group(3))
+            for match in MARKDOWN_IMAGE.finditer(line)
+        )
+
+        for alt, src in images:
+            label_match = BADGE_LABEL.match(src)
+            if label_match is None or alt is None or not alt.strip():
+                continue
+            label = unquote(label_match.group(1))
+            if alt.strip() != label:
+                violations.append(
+                    (
+                        line_number,
+                        BADGE_ALT_TEXT_RULE,
+                        f"badge alt text does not match the badge label {label!r}",
+                    )
+                )
+
     return violations
 
 
@@ -255,6 +298,7 @@ def check_workshop_projects(lines: list[str]) -> list[Violation]:
 CHECKS: tuple[Check, ...] = (
     check_heading_levels,
     check_badge_form,
+    check_badge_alt_text,
     check_alt_text,
     check_link_targets,
     check_workshop_projects,
@@ -262,6 +306,7 @@ CHECKS: tuple[Check, ...] = (
 CHECK_RULE_IDS: dict[Check, str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
     check_badge_form: BADGE_FORM_RULE,
+    check_badge_alt_text: BADGE_ALT_TEXT_RULE,
     check_alt_text: ALT_TEXT_RULE,
     check_link_targets: LINK_TARGET_RULE,
     check_workshop_projects: WORKSHOP_PROJECTS_RULE,
@@ -342,7 +387,7 @@ def run_selftest() -> int:
         "![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat&logo=typescript&logoColor=white)\n"
         "![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)\n"
         "![WebAssembly](https://img.shields.io/badge/WebAssembly-654FF0?style=flat&logo=webassembly&logoColor=white)\n"
-        "![Phaser](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)\n"
+        "![Phaser 4](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)\n"
         "![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)\n"
         "![License](https://img.shields.io/badge/License-blue?style=flat)\n"
         "![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)\n"
@@ -351,6 +396,25 @@ def run_selftest() -> int:
     if actual:
         print(
             f"selftest: badge-form: expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    bad_badge_alt_lines = (
+        "![Phaser](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)"
+    ).splitlines()
+    expected = [
+        (
+            1,
+            "badge-alt-text",
+            "badge alt text does not match the badge label 'Phaser 4'",
+        ),
+    ]
+    actual = collect_violations(bad_badge_alt_lines)
+    covered_rule_ids.update(rule for _, rule, _ in actual)
+    if actual != expected:
+        print(
+            f"selftest: badge-alt-text: expected {expected!r}, got {actual!r}",
             file=sys.stderr,
         )
         return 1
