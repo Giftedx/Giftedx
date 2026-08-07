@@ -7,11 +7,13 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
+from uuid import uuid4
 
 
 Violation = tuple[int, str, str]
 Check = Callable[[list[str]], list[Violation]]
+README_PARENT = Path(__file__).resolve().parent.parent
 HEADING_LEVEL_RULE = "heading-level"
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
 BADGE_FORM_RULE = "badge-form"
@@ -38,6 +40,7 @@ MARKDOWN_IMAGE = re.compile(
     r"!\[([^\]]*)\]\(\s*(?:<([^>]+)>|([^\s)]+))"
 )
 ALT_WORD = re.compile(r"\b\w+(?:[’'-]\w+)*\b")
+IMAGE_PATH_RULE = "image-path"
 LINK_TARGET_RULE = "link-target"
 HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE)
 MARKDOWN_LINK_TARGET = re.compile(
@@ -221,6 +224,38 @@ def check_alt_text(lines: list[str]) -> list[Violation]:
     return violations
 
 
+def check_image_paths(lines: list[str], readme_parent: Path) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(lines, start=1):
+        sources: list[str] = []
+        for image_match in HTML_IMAGE.finditer(line):
+            src_match = HTML_SRC.search(image_match.group())
+            if src_match is not None:
+                sources.append(src_match.group(2) or src_match.group(3) or "")
+
+        sources.extend(
+            match.group(2) or match.group(3)
+            for match in MARKDOWN_IMAGE.finditer(line)
+        )
+
+        for src in sources:
+            parsed_src = urlsplit(src)
+            if parsed_src.scheme or parsed_src.netloc:
+                continue
+            relative_path = Path(unquote(parsed_src.path))
+            if relative_path.is_absolute():
+                continue
+            if not (readme_parent / relative_path).is_file():
+                violations.append(
+                    (
+                        line_number,
+                        IMAGE_PATH_RULE,
+                        f"image path does not resolve to a file: {src}",
+                    )
+                )
+    return violations
+
+
 def check_link_targets(lines: list[str]) -> list[Violation]:
     violations: list[Violation] = []
     for line_number, line in enumerate(lines, start=1):
@@ -303,20 +338,22 @@ CHECKS: tuple[Check, ...] = (
     check_link_targets,
     check_workshop_projects,
 )
-CHECK_RULE_IDS: dict[Check, str] = {
+CHECK_RULE_IDS: dict[Callable[..., list[Violation]], str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
     check_badge_form: BADGE_FORM_RULE,
     check_badge_alt_text: BADGE_ALT_TEXT_RULE,
     check_alt_text: ALT_TEXT_RULE,
+    check_image_paths: IMAGE_PATH_RULE,
     check_link_targets: LINK_TARGET_RULE,
     check_workshop_projects: WORKSHOP_PROJECTS_RULE,
 }
 
 
-def collect_violations(lines: list[str]) -> list[Violation]:
+def collect_violations(lines: list[str], readme_parent: Path) -> list[Violation]:
     violations: list[Violation] = []
     for check in CHECKS:
         violations.extend(check(lines))
+    violations.extend(check_image_paths(lines, readme_parent))
     return violations
 
 
@@ -326,13 +363,29 @@ def report_violations(path: Path, violations: list[Violation]) -> None:
 
 
 def run_selftest() -> int:
+    readme_parent = Path(__file__).parent / f".check-readme-{uuid4().hex}"
+    assets = readme_parent / "assets"
+    readme_parent.mkdir()
+    try:
+        assets.mkdir()
+        for name in ("x.png", "banner.png", "hub-bothy.png", "whs-menu.png"):
+            (assets / name).touch()
+        return run_selftest_with_assets(readme_parent)
+    finally:
+        for name in ("x.png", "banner.png", "hub-bothy.png", "whs-menu.png"):
+            (assets / name).unlink(missing_ok=True)
+        assets.rmdir()
+        readme_parent.rmdir()
+
+
+def run_selftest_with_assets(readme_parent: Path) -> int:
     covered_rule_ids: set[str] = set()
 
     bad_lines = "# A\n### B\n".splitlines()
     expected = [
         (2, HEADING_LEVEL_RULE, "heading level jumps from h1 to h3"),
     ]
-    actual = collect_violations(bad_lines)
+    actual = collect_violations(bad_lines, readme_parent)
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -351,7 +404,7 @@ def run_selftest() -> int:
         "\n"
         "## B\n"
     ).splitlines()
-    actual = collect_violations(good_lines)
+    actual = collect_violations(good_lines, readme_parent)
     if actual:
         print(
             f"selftest: {HEADING_LEVEL_RULE}: expected no violations, got {actual!r}",
@@ -371,7 +424,7 @@ def run_selftest() -> int:
         )
     ]
     for sample in bad_badge_samples:
-        actual = collect_violations([sample])
+        actual = collect_violations([sample], readme_parent)
         covered_rule_ids.update(rule for _, rule, _ in actual)
         if actual != expected_badge_violation:
             print(
@@ -392,7 +445,7 @@ def run_selftest() -> int:
         "![License](https://img.shields.io/badge/License-blue?style=flat)\n"
         "![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)\n"
     ).splitlines()
-    actual = collect_violations(good_badge_lines)
+    actual = collect_violations(good_badge_lines, readme_parent)
     if actual:
         print(
             f"selftest: badge-form: expected no violations, got {actual!r}",
@@ -410,7 +463,7 @@ def run_selftest() -> int:
             "badge alt text does not match the badge label 'Phaser 4'",
         ),
     ]
-    actual = collect_violations(bad_badge_alt_lines)
+    actual = collect_violations(bad_badge_alt_lines, readme_parent)
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -440,7 +493,7 @@ def run_selftest() -> int:
         ),
     )
     for sample, expected in bad_alt_text_samples:
-        actual = collect_violations([sample])
+        actual = collect_violations([sample], readme_parent)
         covered_rule_ids.update(rule for _, rule, _ in actual)
         if actual != expected:
             print(
@@ -461,10 +514,29 @@ def run_selftest() -> int:
         "![Phaser 4](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)\n"
         "![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)\n"
     ).splitlines()
-    actual = collect_violations(good_alt_text_lines)
+    actual = collect_violations(good_alt_text_lines, readme_parent)
     if actual:
         print(
             f"selftest: alt-text: expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    missing_image_lines = (
+        '<img src="./assets/missing.png" alt="An image with a missing file" />'
+    ).splitlines()
+    expected = [
+        (
+            1,
+            "image-path",
+            "image path does not resolve to a file: ./assets/missing.png",
+        ),
+    ]
+    actual = collect_violations(missing_image_lines, readme_parent)
+    covered_rule_ids.update(rule for _, rule, _ in actual)
+    if actual != expected:
+        print(
+            f"selftest: image-path: expected {expected!r}, got {actual!r}",
             file=sys.stderr,
         )
         return 1
@@ -476,7 +548,7 @@ def run_selftest() -> int:
     expected = [
         (1, "link-target", "outbound link target is not approved"),
     ]
-    actual = collect_violations(bad_link_lines)
+    actual = collect_violations(bad_link_lines, readme_parent)
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -489,7 +561,7 @@ def run_selftest() -> int:
         "<a href=\"https://ha.ggis.xyz/wild\">Play</a>\n"
         "[Source](https://github.com/Giftedx/ha-ggis-hub)\n"
     ).splitlines()
-    actual = collect_violations(good_link_lines)
+    actual = collect_violations(good_link_lines, readme_parent)
     if actual:
         print(
             f"selftest: link-target: expected no violations, got {actual!r}",
@@ -520,7 +592,7 @@ def run_selftest() -> int:
             "workshop table project is missing from shop subgraph: Kittiwake",
         ),
     ]
-    actual = collect_violations(bad_workshop_lines)
+    actual = collect_violations(bad_workshop_lines, readme_parent)
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -530,7 +602,7 @@ def run_selftest() -> int:
         )
         return 1
 
-    expected_rule_ids = {CHECK_RULE_IDS[check] for check in CHECKS}
+    expected_rule_ids = set(CHECK_RULE_IDS.values())
     if covered_rule_ids != expected_rule_ids:
         missing = sorted(expected_rule_ids - covered_rule_ids)
         unexpected = sorted(covered_rule_ids - expected_rule_ids)
@@ -541,7 +613,7 @@ def run_selftest() -> int:
         )
         return 1
 
-    print(f"selftest: {len(CHECKS)} rules covered")
+    print(f"selftest: {len(CHECK_RULE_IDS)} rules covered")
     return 0
 
 
@@ -559,7 +631,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, UnicodeDecodeError) as error:
         print(f"error: cannot read {args.path}: {error}", file=sys.stderr)
         return 2
-    violations = collect_violations(lines)
+    violations = collect_violations(lines, README_PARENT)
     report_violations(args.path, violations)
     return 1 if violations else 0
 
