@@ -41,7 +41,7 @@ ALT_WORD = re.compile(r"\b\w+(?:[’'-]\w+)*\b")
 LINK_TARGET_RULE = "link-target"
 HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE)
 MARKDOWN_LINK_TARGET = re.compile(
-    r"(?<!!)\[[^\]]+\]\(\s*(?:<([^>]+)>|([^\s)]+))"
+    r"(?<!!)\[(?:[^\[\]]|!\[[^\]]*\]\([^)]*\))*\]\(\s*(?:<([^>]+)>|([^\s)]+))"
 )
 WORKSHOP_PROJECTS_RULE = "workshop-projects"
 SHOP_SUBGRAPH = re.compile(r"^\s*subgraph\s+shop(?:\[.*\])?\s*$")
@@ -488,6 +488,7 @@ def run_selftest() -> int:
     good_link_lines = (
         "<a href=\"https://ha.ggis.xyz/wild\">Play</a>\n"
         "[Source](https://github.com/Giftedx/ha-ggis-hub)\n"
+        "[![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)](https://github.com/Giftedx/ha-ggis-hub)\n"
     ).splitlines()
     actual = collect_violations(good_link_lines)
     if actual:
