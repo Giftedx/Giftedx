@@ -45,7 +45,7 @@ MARKDOWN_LINK_TARGET = re.compile(
 )
 WORKSHOP_PROJECTS_RULE = "workshop-projects"
 SHOP_SUBGRAPH = re.compile(r"^\s*subgraph\s+shop(?:\[.*\])?\s*$")
-MERMAID_NODE = re.compile(r'^\s*[\w-]+\s*\[\s*"([^"]+)"\s*\]')
+MERMAID_NODE = re.compile(r'[\w-]+\s*\[\s*"([^"]+)"\s*\]')
 WORKSHOP_TABLE_HEADER = re.compile(r"^\|\s*Project\s*\|")
 WORKSHOP_TABLE_PROJECT = re.compile(r"^\|\s*\*\*(.+?)\*\*\s*\|")
 WORKSHOP_TABLE_NON_PROJECTS = frozenset({"The robot"})
@@ -257,8 +257,7 @@ def check_workshop_projects(lines: list[str]) -> list[Violation]:
             if line.strip() == "end":
                 in_shop = False
                 continue
-            match = MERMAID_NODE.match(line)
-            if match:
+            for match in MERMAID_NODE.finditer(line):
                 shop_projects[match.group(1)] = line_number
 
         if WORKSHOP_TABLE_HEADER.match(line):
@@ -526,6 +525,30 @@ def run_selftest() -> int:
         print(
             "selftest: workshop-projects: "
             f"expected {expected!r}, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    good_workshop_lines = (
+        "```mermaid\n"
+        "flowchart LR\n"
+        '    subgraph shop["The workshop — private, for now"]\n'
+        '        ag["AccentGuessr"] --> kw["Kittiwake"]\n'
+        "    end\n"
+        "```\n"
+        "\n"
+        "# In the workshop\n"
+        "\n"
+        "| Project | What it is |\n"
+        "| --- | --- |\n"
+        "| **The robot** | It tends the projects. |\n"
+        "| **AccentGuessr** | A game. |\n"
+        "| **Kittiwake** | A website. |\n"
+    ).splitlines()
+    actual = collect_violations(good_workshop_lines)
+    if actual:
+        print(
+            f"selftest: workshop-projects: expected no violations, got {actual!r}",
             file=sys.stderr,
         )
         return 1
