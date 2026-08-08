@@ -43,6 +43,8 @@ HTML_HREF = re.compile(r"""<a\b[^>]*\bhref\s*=\s*(["'])(.*?)\1""", re.IGNORECASE
 MARKDOWN_LINK_TARGET = re.compile(
     r"(?<!!)\[[^\]]+\]\(\s*(?:<([^>]+)>|([^\s)]+))"
 )
+MARKDOWN_AUTOLINK = re.compile(r"<([a-zA-Z]+://[^>]+)>")
+BARE_URL = re.compile(r"(?<![<\"'\(])https?://[^\s<>\"')]+")
 WORKSHOP_PROJECTS_RULE = "workshop-projects"
 SHOP_SUBGRAPH = re.compile(r"^\s*subgraph\s+shop(?:\[.*\])?\s*$")
 MERMAID_NODE = re.compile(r'^\s*[\w-]+\s*\[\s*"([^"]+)"\s*\]')
@@ -229,6 +231,12 @@ def check_link_targets(lines: list[str]) -> list[Violation]:
             match.group(1) or match.group(2)
             for match in MARKDOWN_LINK_TARGET.finditer(line)
         )
+        targets.extend(
+            match.group(1) for match in MARKDOWN_AUTOLINK.finditer(line)
+        )
+        targets.extend(
+            match.group(0) for match in BARE_URL.finditer(line)
+        )
         for target in targets:
             if target.startswith(("http://", "https://")) and (
                 target not in APPROVED_LINK_TARGETS
@@ -360,23 +368,39 @@ def run_selftest() -> int:
         return 1
 
     bad_badge_samples = (
-        "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
-        '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge" alt="Go">',
-    )
-    expected_badge_violation = [
         (
-            1,
-            "badge-form",
-            "shields.io badge URL does not use the two-segment style=flat form",
-        )
-    ]
-    for sample in bad_badge_samples:
+            "https://img.shields.io/badge/Phaser-4-9070b0?style=flat",
+            [
+                (
+                    1,
+                    "badge-form",
+                    "shields.io badge URL does not use the two-segment style=flat form",
+                ),
+                (
+                    1,
+                    "link-target",
+                    "outbound link target is not approved",
+                )
+            ]
+        ),
+        (
+            '<img src="https://img.shields.io/badge/Go-00ADD8?style=for-the-badge" alt="Go">',
+            [
+                (
+                    1,
+                    "badge-form",
+                    "shields.io badge URL does not use the two-segment style=flat form",
+                )
+            ]
+        ),
+    )
+    for sample, expected in bad_badge_samples:
         actual = collect_violations([sample])
         covered_rule_ids.update(rule for _, rule, _ in actual)
-        if actual != expected_badge_violation:
+        if actual != expected:
             print(
                 "selftest: badge-form: "
-                f"expected {expected_badge_violation!r}, got {actual!r}",
+                f"expected {expected!r}, got {actual!r}",
                 file=sys.stderr,
             )
             return 1
@@ -471,10 +495,14 @@ def run_selftest() -> int:
 
     bad_link_lines = (
         "[Just Five More Minutes]"
-        "(https://ha.ggis.xyz/just-five-more-minuets/)"
+        "(https://ha.ggis.xyz/just-five-more-minuets/)\n"
+        "Kittiwake — https://github.com/Giftedx/Kittiwake\n"
+        "<https://github.com/Giftedx/Kittiwake>"
     ).splitlines()
     expected = [
         (1, "link-target", "outbound link target is not approved"),
+        (2, "link-target", "outbound link target is not approved"),
+        (3, "link-target", "outbound link target is not approved"),
     ]
     actual = collect_violations(bad_link_lines)
     covered_rule_ids.update(rule for _, rule, _ in actual)
