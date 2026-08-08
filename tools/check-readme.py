@@ -530,6 +530,63 @@ def run_selftest() -> int:
         )
         return 1
 
+    bad_workshop_lines_missing_from_table = (
+        "```mermaid\n"
+        "flowchart LR\n"
+        '    subgraph shop["The workshop — private, for now"]\n'
+        '        ag["AccentGuessr"]\n'
+        '        kw["Kittiwake"]\n'
+        "    end\n"
+        "```\n"
+        "\n"
+        "# In the workshop\n"
+        "\n"
+        "| Project | What it is |\n"
+        "| --- | --- |\n"
+        "| **The robot** | It tends the projects. |\n"
+        "| **AccentGuessr** | A game. |\n"
+    ).splitlines()
+    expected = [
+        (
+            5,
+            "workshop-projects",
+            "shop subgraph project is missing from workshop table: Kittiwake",
+        ),
+    ]
+    actual = collect_violations(bad_workshop_lines_missing_from_table)
+    covered_rule_ids.update(rule for _, rule, _ in actual)
+    if actual != expected:
+        print(
+            "selftest: workshop-projects: "
+            f"expected {expected!r}, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    good_workshop_lines = (
+        "```mermaid\n"
+        "flowchart LR\n"
+        '    subgraph shop["The workshop — private, for now"]\n'
+        '        ag["AccentGuessr"]\n'
+        "    end\n"
+        "```\n"
+        "\n"
+        "# In the workshop\n"
+        "\n"
+        "| Project | What it is |\n"
+        "| --- | --- |\n"
+        "| **The robot** | It tends the projects. |\n"
+        "| **AccentGuessr** | A game. |\n"
+    ).splitlines()
+    actual = collect_violations(good_workshop_lines)
+    if actual:
+        print(
+            "selftest: workshop-projects: "
+            f"expected no violations, got {actual!r}",
+            file=sys.stderr,
+        )
+        return 1
+
     expected_rule_ids = {CHECK_RULE_IDS[check] for check in CHECKS}
     if covered_rule_ids != expected_rule_ids:
         missing = sorted(expected_rule_ids - covered_rule_ids)
