@@ -5,13 +5,20 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+import tempfile
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import unquote
 
 
 Violation = tuple[int, str, str]
-Check = Callable[[list[str]], list[Violation]]
+
+@dataclass
+class Document:
+    lines: list[str]
+    base_dir: Path
+Check = Callable[[Document], list[Violation]]
 HEADING_LEVEL_RULE = "heading-level"
 HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
 BADGE_FORM_RULE = "badge-form"
@@ -25,6 +32,7 @@ BADGE_LABEL = re.compile(
     r"^https?://img\.shields\.io/badge/([^-/\s?]+)-"
 )
 ALT_TEXT_RULE = "alt-text"
+ASSET_MISSING_RULE = "asset-missing"
 HTML_IMAGE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
 HTML_ALT = re.compile(
     r"\balt\s*=\s*(?:([\"'])(.*?)\1|([^\s>]+))",
@@ -62,13 +70,13 @@ APPROVED_LINK_TARGETS = frozenset(
 )
 
 
-def check_heading_levels(lines: list[str]) -> list[Violation]:
+def check_heading_levels(document: Document) -> list[Violation]:
     violations: list[Violation] = []
     previous_level: int | None = None
     fence_char: str | None = None
     fence_length = 0
 
-    for line_number, line in enumerate(lines, start=1):
+    for line_number, line in enumerate(document.lines, start=1):
         stripped = line.lstrip(" ")
         indent = len(line) - len(stripped)
 
@@ -120,9 +128,9 @@ def check_heading_levels(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_badge_form(lines: list[str]) -> list[Violation]:
+def check_badge_form(document: Document) -> list[Violation]:
     violations: list[Violation] = []
-    for line_number, line in enumerate(lines, start=1):
+    for line_number, line in enumerate(document.lines, start=1):
         for match in SHIELDS_URL.finditer(line):
             if BADGE_FORM.fullmatch(match.group()) is None:
                 violations.append(
@@ -136,9 +144,9 @@ def check_badge_form(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_badge_alt_text(lines: list[str]) -> list[Violation]:
+def check_badge_alt_text(document: Document) -> list[Violation]:
     violations: list[Violation] = []
-    for line_number, line in enumerate(lines, start=1):
+    for line_number, line in enumerate(document.lines, start=1):
         images: list[tuple[str | None, str]] = []
         for image_match in HTML_IMAGE.finditer(line):
             image = image_match.group()
@@ -174,9 +182,9 @@ def check_badge_alt_text(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_alt_text(lines: list[str]) -> list[Violation]:
+def check_alt_text(document: Document) -> list[Violation]:
     violations: list[Violation] = []
-    for line_number, line in enumerate(lines, start=1):
+    for line_number, line in enumerate(document.lines, start=1):
         images: list[tuple[str | None, str]] = []
         for image_match in HTML_IMAGE.finditer(line):
             image = image_match.group()
@@ -221,9 +229,9 @@ def check_alt_text(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_link_targets(lines: list[str]) -> list[Violation]:
+def check_link_targets(document: Document) -> list[Violation]:
     violations: list[Violation] = []
-    for line_number, line in enumerate(lines, start=1):
+    for line_number, line in enumerate(document.lines, start=1):
         targets = [match.group(2) for match in HTML_HREF.finditer(line)]
         targets.extend(
             match.group(1) or match.group(2)
@@ -243,13 +251,13 @@ def check_link_targets(lines: list[str]) -> list[Violation]:
     return violations
 
 
-def check_workshop_projects(lines: list[str]) -> list[Violation]:
+def check_workshop_projects(document: Document) -> list[Violation]:
     shop_projects: dict[str, int] = {}
     table_projects: dict[str, int] = {}
     in_shop = False
     in_table = False
 
-    for line_number, line in enumerate(lines, start=1):
+    for line_number, line in enumerate(document.lines, start=1):
         if SHOP_SUBGRAPH.match(line):
             in_shop = True
             continue
@@ -295,6 +303,42 @@ def check_workshop_projects(lines: list[str]) -> list[Violation]:
     return violations
 
 
+def check_asset_missing(document: Document) -> list[Violation]:
+    violations: list[Violation] = []
+    for line_number, line in enumerate(document.lines, start=1):
+        images: list[str] = []
+        for image_match in HTML_IMAGE.finditer(line):
+            image = image_match.group()
+            src_match = HTML_SRC.search(image)
+            if src_match is not None:
+                src = src_match.group(2) or src_match.group(3) or ""
+                images.append(src)
+
+        images.extend(
+            (match.group(2) or match.group(3))
+            for match in MARKDOWN_IMAGE.finditer(line)
+        )
+
+        for src in images:
+            if src.startswith(("http://", "https://", "data:")):
+                continue
+
+            # resolve relative to base_dir
+            try:
+                # unquote is imported
+                path_str = unquote(src)
+                resolved_path = document.base_dir / path_str
+                if not resolved_path.is_file():
+                    violations.append((
+                        line_number,
+                        ASSET_MISSING_RULE,
+                        f"referenced image does not exist: {src}",
+                    ))
+            except Exception:
+                pass
+
+    return violations
+
 CHECKS: tuple[Check, ...] = (
     check_heading_levels,
     check_badge_form,
@@ -302,6 +346,7 @@ CHECKS: tuple[Check, ...] = (
     check_alt_text,
     check_link_targets,
     check_workshop_projects,
+    check_asset_missing,
 )
 CHECK_RULE_IDS: dict[Check, str] = {
     check_heading_levels: HEADING_LEVEL_RULE,
@@ -310,13 +355,14 @@ CHECK_RULE_IDS: dict[Check, str] = {
     check_alt_text: ALT_TEXT_RULE,
     check_link_targets: LINK_TARGET_RULE,
     check_workshop_projects: WORKSHOP_PROJECTS_RULE,
+    check_asset_missing: ASSET_MISSING_RULE,
 }
 
 
-def collect_violations(lines: list[str]) -> list[Violation]:
+def collect_violations(document: Document) -> list[Violation]:
     violations: list[Violation] = []
     for check in CHECKS:
-        violations.extend(check(lines))
+        violations.extend(check(document))
     return violations
 
 
@@ -332,7 +378,7 @@ def run_selftest() -> int:
     expected = [
         (2, HEADING_LEVEL_RULE, "heading level jumps from h1 to h3"),
     ]
-    actual = collect_violations(bad_lines)
+    actual = collect_violations(Document(bad_lines, Path('.')))
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -351,7 +397,7 @@ def run_selftest() -> int:
         "\n"
         "## B\n"
     ).splitlines()
-    actual = collect_violations(good_lines)
+    actual = collect_violations(Document(good_lines, Path('.')))
     if actual:
         print(
             f"selftest: {HEADING_LEVEL_RULE}: expected no violations, got {actual!r}",
@@ -371,7 +417,7 @@ def run_selftest() -> int:
         )
     ]
     for sample in bad_badge_samples:
-        actual = collect_violations([sample])
+        actual = collect_violations(Document([sample], Path('.')))
         covered_rule_ids.update(rule for _, rule, _ in actual)
         if actual != expected_badge_violation:
             print(
@@ -392,7 +438,7 @@ def run_selftest() -> int:
         "![License](https://img.shields.io/badge/License-blue?style=flat)\n"
         "![Go](https://img.shields.io/badge/Go-00ADD8?style=flat&logo=go)\n"
     ).splitlines()
-    actual = collect_violations(good_badge_lines)
+    actual = collect_violations(Document(good_badge_lines, Path('.')))
     if actual:
         print(
             f"selftest: badge-form: expected no violations, got {actual!r}",
@@ -410,7 +456,7 @@ def run_selftest() -> int:
             "badge alt text does not match the badge label 'Phaser 4'",
         ),
     ]
-    actual = collect_violations(bad_badge_alt_lines)
+    actual = collect_violations(Document(bad_badge_alt_lines, Path('.')))
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -422,7 +468,7 @@ def run_selftest() -> int:
     bad_alt_text_samples = (
         (
             '<img src="./assets/x.png" />',
-            [(1, "alt-text", "image alt text is missing or empty")],
+            [(1, "alt-text", "image alt text is missing or empty"), (1, "asset-missing", "referenced image does not exist: ./assets/x.png")],
         ),
         (
             '<img src="./assets/x.png" alt="banner" />',
@@ -431,16 +477,17 @@ def run_selftest() -> int:
                     1,
                     "alt-text",
                     "content image alt text has 1 word. Use at least 4 words",
-                )
+                ),
+                (1, "asset-missing", "referenced image does not exist: ./assets/x.png"),
             ],
         ),
         (
             "![](./assets/x.png)",
-            [(1, "alt-text", "image alt text is missing or empty")],
+            [(1, "alt-text", "image alt text is missing or empty"), (1, "asset-missing", "referenced image does not exist: ./assets/x.png")],
         ),
     )
     for sample, expected in bad_alt_text_samples:
-        actual = collect_violations([sample])
+        actual = collect_violations(Document([sample], Path('.')))
         covered_rule_ids.update(rule for _, rule, _ in actual)
         if actual != expected:
             print(
@@ -461,13 +508,22 @@ def run_selftest() -> int:
         "![Phaser 4](https://img.shields.io/badge/Phaser%204-9070b0?style=flat)\n"
         "![Astro](https://img.shields.io/badge/Astro-BC52EE?style=flat&logo=astro&logoColor=white)\n"
     ).splitlines()
-    actual = collect_violations(good_alt_text_lines)
-    if actual:
-        print(
-            f"selftest: alt-text: expected no violations, got {actual!r}",
-            file=sys.stderr,
-        )
-        return 1
+
+    # Mock files for good_alt_text_lines so asset-missing won't trigger
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+        (assets_dir / "banner.png").touch()
+        (assets_dir / "hub-bothy.png").touch()
+        (assets_dir / "whs-menu.png").touch()
+        actual = collect_violations(Document(good_alt_text_lines, tmp_path))
+        if actual:
+            print(
+                f"selftest: alt-text: expected no violations, got {actual!r}",
+                file=sys.stderr,
+            )
+            return 1
 
     bad_link_lines = (
         "[Just Five More Minutes]"
@@ -476,7 +532,7 @@ def run_selftest() -> int:
     expected = [
         (1, "link-target", "outbound link target is not approved"),
     ]
-    actual = collect_violations(bad_link_lines)
+    actual = collect_violations(Document(bad_link_lines, Path('.')))
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -489,7 +545,7 @@ def run_selftest() -> int:
         "<a href=\"https://ha.ggis.xyz/wild\">Play</a>\n"
         "[Source](https://github.com/Giftedx/ha-ggis-hub)\n"
     ).splitlines()
-    actual = collect_violations(good_link_lines)
+    actual = collect_violations(Document(good_link_lines, Path('.')))
     if actual:
         print(
             f"selftest: link-target: expected no violations, got {actual!r}",
@@ -520,7 +576,7 @@ def run_selftest() -> int:
             "workshop table project is missing from shop subgraph: Kittiwake",
         ),
     ]
-    actual = collect_violations(bad_workshop_lines)
+    actual = collect_violations(Document(bad_workshop_lines, Path('.')))
     covered_rule_ids.update(rule for _, rule, _ in actual)
     if actual != expected:
         print(
@@ -529,6 +585,45 @@ def run_selftest() -> int:
             file=sys.stderr,
         )
         return 1
+
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        assets_dir = tmp_path / "assets"
+        assets_dir.mkdir()
+
+        readme_path = tmp_path / "README.md"
+        readme_path.write_text('<img src="./assets/nope.png" alt="This is four words" />\n')
+
+        expected_asset_violation = [
+            (1, ASSET_MISSING_RULE, "referenced image does not exist: ./assets/nope.png"),
+        ]
+        actual = collect_violations(Document(readme_path.read_text().splitlines(), tmp_path))
+        covered_rule_ids.update(rule for _, rule, _ in actual)
+
+        if actual != expected_asset_violation:
+            print(
+                "selftest: asset-missing: "
+                f"expected {expected_asset_violation!r}, got {actual!r}",
+                file=sys.stderr,
+            )
+            return 1
+
+        # clean case
+        good_asset_file = assets_dir / "yep.png"
+        good_asset_file.touch()
+        readme_path.write_text(
+            '<img src="./assets/yep.png" alt="This is four words" />\n'
+            '![This is four words](https://example.com/image.png)\n'
+            '![This is four words](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==)\n'
+        )
+        actual = collect_violations(Document(readme_path.read_text().splitlines(), tmp_path))
+        if actual:
+            print(
+                f"selftest: asset-missing: expected no violations, got {actual!r}",
+                file=sys.stderr,
+            )
+            return 1
 
     expected_rule_ids = {CHECK_RULE_IDS[check] for check in CHECKS}
     if covered_rule_ids != expected_rule_ids:
@@ -559,7 +654,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, UnicodeDecodeError) as error:
         print(f"error: cannot read {args.path}: {error}", file=sys.stderr)
         return 2
-    violations = collect_violations(lines)
+    violations = collect_violations(Document(lines, args.path.parent))
     report_violations(args.path, violations)
     return 1 if violations else 0
 
